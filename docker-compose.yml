@@ -7,7 +7,7 @@ services:
       - .:/supplements-api
       - supplements_api_node_modules:/supplements-api/node_modules
     environment:
-      MYSQL_HOST: mysql
+      MYSQL_HOST: db
       MYSQL_DATABASE: supplements_db
       MYSQL_USER: user
       MYSQL_PASSWORD: password
