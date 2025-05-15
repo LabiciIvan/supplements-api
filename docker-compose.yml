@@ -7,10 +7,14 @@ services:
       - .:/supplements-api
       - supplements_api_node_modules:/supplements-api/node_modules
     environment:
-      MYSQL_HOST: db
-      MYSQL_DATABASE: supplements_db
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
+      MYSQL_HOST: ${MYSQL_HOST}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      APP_ENV: ${APP_ENV}
+      APP_EMAIL: ${APP_EMAIL}
+      APP_EMAIL_SECRET: ${APP_EMAIL_SECRET}
     container_name: supplements-cnt
     command: npm run dev
     depends_on:
