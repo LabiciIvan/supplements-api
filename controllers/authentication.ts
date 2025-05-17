@@ -1,14 +1,30 @@
-import { FieldPacket, Pool, QueryError, QueryResult } from 'mysql2/promise';
-import * as jose from 'jose';
-
-import DB               from '../core/database';
+import {
+  FieldPacket,
+  QueryError
+}                     from 'mysql2/promise';
 import {
   hasArrayData,
   hashPassword 
-}                       from '../services/functions';
+}                     from '../services/functions';
+import * as jose      from 'jose';
+import BaseController from '../core/baseController';
 
 
-class Auth {
+
+/**
+ * Authentication class.
+ * 
+ * This class handles user authentication, including login, logout, registration and delete.
+ *
+ * It interacts with the database to check user credentials, login attempts, and manage user
+ * registration.
+ *
+ * It also generates and verifies JWT tokens for user sessions.
+ *
+ * @class Auth
+ */
+class Auth extends BaseController {
+
 
   /*
    * The number of allowed login attempts before the user is blocked for 24 hours, as  a security
@@ -18,13 +34,56 @@ class Auth {
 
 
   /**
-   * The database connection pool, used to interact with the MySQL database.
+   * The number of JWT login token duration (3 hours).
    */
-  private db: Pool;
+  private DURATION_LOGIN_TOKEN: string = '3 hour';
+
+
+  /**
+   * Password reset limit, if exceeded the application won't generate password reset tokens.
+   */
+  private DAILY_PASSWORD_RESET_LIMIT: number = 4;
+
+
+  /**
+   * The password reset token duration (10 min).
+   */
+  private PASSWORD_RESET_TOKEN_LIFESPAN: string = '10 min';
 
 
   constructor() {
-    this.db = DB;
+    super();
+  }
+
+
+  /**
+   * This method is used to prevent multiple login tokens for the same user.
+   *
+   * It checks if there are any existing login tokens for the user with the given email address and
+   * sequentially logs out any existing tokens by calling the logout method for each token found.
+   *
+   * @param email - The email address of the user to check for existing login tokens.
+   * @returns 
+   */
+  private async preventMultipleLoginToken(email: string): Promise<void> {
+    try {
+      const loginTokens: [any, FieldPacket[]] = await this.db.query(
+        'SELECT lu.jwt_token AS token FROM logged_users AS lu INNER JOIN users AS u ON lu.user_id = u.id WHERE u.email = ? AND lu.expires_at > NOW()',
+        [email]
+      );
+
+      if (!hasArrayData(loginTokens[0])) return;
+
+      loginTokens[0].map( async (data: {token: string}) => {
+        await this.logout(data['token']);
+      });
+
+      return;
+
+    } catch (error: any) {
+      console.log('Error in /controllers/authentication.ts/preventMultipleLoginToken(): ', error);
+      throw new Error(error.message || 'Internal server error');
+    }
   }
 
 
@@ -39,10 +98,10 @@ class Auth {
    * @returns  - A promise that resolves to an array containing the user's ID, email, and password
    *             hash if the user exists, or an empty array if the user does not exist.
    */
-  private async checkUserExists(email: string): Promise<[{id: number; email: string; password_hash: string}]> {
+  public async checkUserExists(email: string): Promise<[{id: number; email: string; password_hash: string}]> {
     try {
       const [user]: [any, FieldPacket[]] = await this.db.query(
-        'SELECT id, email, password_hash FROM users WHERE email = ?',
+        'SELECT id, email, password_hash FROM users WHERE email = ? AND deleted = 0',
         [email]
       );
 
@@ -72,6 +131,8 @@ class Auth {
   async login(email: string, password: string, ipAddress: string, userAgent: string): Promise<{token?: string} | {message: string}> {
     try {
       const user = await this.checkUserExists(email);
+
+      await this.preventMultipleLoginToken(email);
 
       if (!hasArrayData(user)) {
         return {message: 'User not found.'};
@@ -105,104 +166,29 @@ class Auth {
         [user[0].id, user[0].email, ipAddress, userAgent]
       );
 
-      // Token is valid 2 hours after it is issued.
+      // Token is valid 3 hours after it is issued.
       const token = await new jose.SignJWT({userId: user[0].id})
         .setProtectedHeader({alg: 'HS256'})
         .setIssuedAt()
-        .setExpirationTime('2h')
+        .setExpirationTime(this.DURATION_LOGIN_TOKEN)
         .sign(new TextEncoder().encode(process.env.JWT_SECRET));
 
-      const now = Math.floor(Date.now() / 1000);
-
-      const expiresAt = new Date((now + 2 * 60 * 60) * 1000);
-
       await this.db.query(
-        'INSERT INTO logged_users (user_id, jwt_token, ip_address, user_agent, expires_at) VALUES (?, ?, ? , ?, ?)',
-        [user[0].id, token, ipAddress, userAgent, expiresAt]
+        `INSERT INTO logged_users (user_id, jwt_token, ip_address, user_agent, expires_at) VALUES (?, ?, ? , ?, (NOW() + INTERVAL ${this.DURATION_LOGIN_TOKEN}))`,
+        [user[0].id, token, ipAddress, userAgent]
       );
 
       return {token: token};
 
     } catch (error: any) {
-      console.log('Error in login method:', error);
+      console.log('Error in /controllers/authentication.ts/login: ', error);
       throw new Error(error.message || 'Internal server errora');
     }
 
   }
 
 
-  async logout(): Promise<void> {
-    // Implement logout logic here
-  }
-
-
-  async isAuthorised(): Promise<boolean> {
-    // Implement auth check here
-    return false;
-  }
-
-
-  async isLogged(token: string): Promise<boolean> {
-    // Implement logged check here
-    try {
-
-      const { payload } = await jose.jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
-
-      const userId = payload.userId as number;
-
-      const isLogged: [any, FieldPacket[]] = await this.db.query(
-        'SELECT * FROM logged_users WHERE user_id = ? AND jwt_token = ? AND expires_at > NOW()',
-        [userId, token]
-      );
-
-      console.log('isLogged:', isLogged);
-      
-      return true;
-
-    } catch (error: any) {
-      console.log('Error in isLogged method:', error);
-      throw new Error(error.message || 'Internal server error');
-    }
-  }
-
-  /**
-   * Registers a new user in the database.
-   *
-   * @param username - The username of the user to register.
-   * @param email    - The email address of the user to register.
-   * @param password - The password of the user to register.
-   *
-   * @returns  - A promise that resolves to an object containing a message and the user ID if the 
-   *             registration is successful, or an error message if the registration fails.
-   */
-  async register(username: string, email: string, password: string): Promise<{ message: string; userId?: number }> {
-    try {
-
-      const [result]: [any, FieldPacket[]] = await this.db.query(
-        'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)',
-        [username, email, password]
-      );
-
-      return {
-        message: 'User registered successfully.',
-        userId: result.insertId,
-      };
-
-    } catch (error) {
-
-      if ((error as QueryError).code === 'ER_DUP_ENTRY') {
-        throw new Error('Username or email already exists');
-      }
-
-      if (error instanceof Error) {
-        throw new Error(error.message);
-      }
-
-      throw new Error('Internal server error' );
-    }
-  }
-
-
 }
+
 
 export default Auth;
