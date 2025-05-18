@@ -188,6 +188,105 @@ class Auth extends BaseController {
   }
 
 
+  /**
+   * This method is used to log out a user by setting the expiration date of the JWT token to 1 year
+   * before the current date.
+   *
+   * This effectively invalidates the token and prevents further access.
+   *
+   * @param token - The JWT token to be invalidated.
+   * @returns
+   */
+  async logout(token: string): Promise<void> {
+    // Implement logout logic here
+    try {
+      await this.db.query(
+        'UPDATE logged_users SET expires_at = (SELECT expires_at WHERE jwt_token = ?) - INTERVAl 1 YEAR WHERE jwt_token = ?',
+        [token, token]
+      );
+
+      return;
+    } catch (error: any) {
+      console.log('Error in /controllers/authentication.ts/logout(): ', error);
+      throw new Error(error.message || 'Internal server error');
+    }
+  }
+
+
+  /**
+   * Registers a new user in the database.
+   *
+   * @param username - The username of the user to register.
+   * @param email    - The email address of the user to register.
+   * @param password - The password of the user to register.
+   *
+   * @returns  - A promise that resolves to an object containing a message and the user ID if the 
+   *             registration is successful, or an error message if the registration fails.
+   */
+  async register(username: string, email: string, password: string): Promise<{ message: string; userId?: number }> {
+    try {
+
+      const [result]: [any, FieldPacket[]] = await this.db.query(
+        'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)',
+        [username, email, password]
+      );
+
+      // Default role is customer and only admin can change it.
+      await this.db.query(
+        'INSERT INTO roles (user_id, role) VALUES (?, "customer")',
+        [result.insertId]
+      )
+
+      return {
+        message: 'User registered successfully.',
+        userId: result.insertId,
+      };
+
+    } catch (error) {
+
+      if ((error as QueryError).code === 'ER_DUP_ENTRY') {
+        throw new Error('Username or email already exists');
+      }
+
+      if (error instanceof Error) {
+        throw new Error(error.message);
+      }
+
+      throw new Error('Internal server error' );
+    }
+  }
+
+
+  /**
+   * Deletes an user from the database.
+   *
+   * The delete happens by updating the deleted column from users table to 1 (YES).
+   *
+   * @param token - The JWT token to identify the user.
+   * @returns     - A promise that resolves to an object containing a message and the user ID if the
+   *                delete is successful, or an error message if the registration fails.
+   */
+  async delete(token: string): Promise<{message: string, userId: number}> {
+    try {
+
+      const actionDelete = await this.db.query(
+        'UPDATE users AS u INNER JOIN logged_users AS lu ON u.id = lu.user_id SET u.deleted = 1, u.deleted_at = CURRENT_TIMESTAMP WHERE lu.jwt_token = ?',
+        [token]
+      );
+
+      console.log('actionDelete', actionDelete);
+
+      return {
+        message: 'User deleted successfully',
+        userId: 1
+      }
+
+    } catch (error: any) {
+      console.log('Error in /controllers/authentication.ts/delete(): ', error);
+      throw new Error('Internal server error');
+    }
+  }
+
 }
 
 
