@@ -287,6 +287,70 @@ class Auth extends BaseController {
     }
   }
 
+
+  /**
+   * Generate password reset token.DAILY_PASSWORD_RESET_LIMIT
+   *
+   * Password reset token is valid 10 minutes (check PASSWORD_RESET_TOKEN_LIFESPAN constant)
+   * from the moment it was generated.
+   *
+   * Password reset email requests are limited to a maximum of 4 times per day, and tokens are
+   * limited only on the day they are requested,once the daily limit is reached no additional reset
+   * tokens will be generated.
+   *
+   * You can adjust the daily request limit by modifying the DAILY_PASSWORD_RESET_LIMIT constant in 
+   * this class, similarly, the duration of token validity can be updated by changing the 
+   * PASSWORD_RESET_TOKEN_LIFESPAN constant.
+   *
+   * @param email    - The email address of the user to generate the reset password token.
+   */
+  async generatePasswordResetToken(email: string): Promise<any> {
+    try {
+
+      const [resetTokenData]: [any, FieldPacket[]] = await this.db.query(
+        `SELECT
+          COUNT(pr.token) AS requestedTokensNumber
+          FROM password_reset AS pr INNER JOIN users AS u ON pr.user_id = u.id
+          WHERE u.email = ? AND DATE(pr.created_at) = CURRENT_DATE
+        `,
+        [email]
+      );
+
+      if (hasArrayData(resetTokenData) && resetTokenData[0].requestedTokensNumber === this.DAILY_PASSWORD_RESET_LIMIT) {
+        return {
+          message: 'Password reset limit reached, try again tomorrow!'
+        }
+      }
+
+      const passwordResetToken = await new jose.SignJWT({userEmail: email})
+        .setProtectedHeader({alg: 'HS256'})
+        .setIssuedAt()
+        .setExpirationTime(this.PASSWORD_RESET_TOKEN_LIFESPAN)
+        .sign(new TextEncoder().encode(process.env.JWT_SECRET));
+
+      // Invalidate any valid password reset tokens for today for this user.
+      await this.db.query(
+        `UPDATE password_reset SET valid = 'N' WHERE DATE(created_at) = CURRENT_DATE AND user_id = (SELECT id FROM users WHERE email = ?)`,
+        [email]
+      );
+
+
+      // Insert the password reset token into the database.
+      await this.db.query(
+        `INSERT INTO password_reset (user_id, token) VALUES
+        ((SELECT id FROM users WHERE email = ?), ?)`,
+        [email, passwordResetToken]
+      );
+
+      return {token: passwordResetToken};
+
+    } catch (error: any) {
+      console.log('Error in /controllers/authentication.ts/generatePasswordResetToken(): ', error);
+      throw new Error('Internal server error');
+    }
+  }
+
+
 }
 
 
