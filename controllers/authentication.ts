@@ -351,6 +351,32 @@ class Auth extends BaseController {
   }
 
 
+  /**
+   * Check token validity.
+   *
+   * Checks if the password reset token is valid, by fetching the token and verifying the 'valid'
+   * column to be 'Y'.
+   *
+   * @param token - The JWT token to identify the user.
+   * @returns     - TRUE if token is valid FALSE otherwise.
+   */
+  async isResetTokenValid(token: string): Promise<boolean> {
+    const [rows]: [any[], FieldPacket[]] = await this.db.query(
+      `SELECT IF(valid = 'Y', TRUE, FALSE) AS isValid
+      FROM password_reset
+      WHERE token = ?
+      LIMIT 1`,
+      [token]
+    );
+
+    if (rows.length === 0) {
+      return false;
+    }
+
+    return rows[0].isValid === 1 || rows[0].isValid === true;
+  }
+
+
 }
 
 
