@@ -377,6 +377,57 @@ class Auth extends BaseController {
   }
 
 
+  async resetUserPassword(hashedPassword: string, userEmail: string): Promise<any> {
+    try {
+
+      const [userPasswords]: [any, FieldPacket[]] = await this.db.query(
+        `SELECT
+          password_reset_1 AS pwd1,
+          password_reset_2 AS pwd2,
+          password_reset_3 AS pwd3,
+          password_reset_4 AS pwd4,
+          password_reset_date AS lastPasswordResetDate,
+          password_hash AS currentPassword
+        FROM users WHERE email = ?`,
+        [userEmail]
+      );
+
+      if (userPasswords[0].pwd1 === hashedPassword || userPasswords[0].pwd2 === hashedPassword || userPasswords[0].pwd3 === hashedPassword || userPasswords[0].pwd4 === hashedPassword || userPasswords[0].currentPassword === hashedPassword) {
+        return {
+          message: 'Please choose a password that is different from your previous passwords.'
+        }
+      }
+
+      // Invalidate any valid password reset tokens for today for this user.
+      await this.db.query(
+        `UPDATE password_reset SET valid = 'N', reset = 'Y' WHERE DATE(created_at) = CURRENT_DATE AND valid = 'Y' AND user_id = (SELECT id FROM users WHERE email = ?)`,
+        [userEmail]
+      );
+
+      await this.db.query(`
+        UPDATE users SET
+          password_reset_1 = password_reset_2,
+          password_reset_2 = password_reset_3,
+          password_reset_3 = password_reset_4,
+          password_reset_4 = password_hash,
+          password_reset_date = CURRENT_TIMESTAMP,
+          password_hash = ?
+        WHERE email = ?
+        `,
+        [hashedPassword, userEmail]
+      );
+
+      return {
+        message: 'Your password has been updated successfully.'
+      }
+
+    } catch (error: any) {
+      console.log('Error in /controllers/authentication.ts/resetUserPassword(): ', error);
+      throw new Error('Internal server error');
+    }
+  }
+
+
 }
 
 
