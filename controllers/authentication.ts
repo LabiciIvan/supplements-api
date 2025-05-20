@@ -377,6 +377,28 @@ class Auth extends BaseController {
   }
 
 
+  /**
+   * Reset user password.
+   *
+   * Resets user password by updating the 'password_hash' column from users table with the new hash.
+   *
+   * The steps of how this method works are described as such:
+   *    1. Select all 4 password_reset columns as well as current user password and check agains the
+   *       new password hash, the new password must be different to the previous 4 and current one.
+   *    2. Invalidates the password reset token and marks 'reset' column to 'Y', which means this
+   *       token was used to actually reset a password.
+   *    3. Updated all 4 password_reset columns with previous one and sets the password_reset_date
+   *       to current TIMESTAMP, in following order:
+   *       - password_reset_1 takes value of password_reset_2; 
+   *       - password_reset_2 takes value of password_reset_3;
+   *       - password_reset_3 takes value of password_reset_4;
+   *       - password_reset_4 takes value of password_hash;
+   *
+   * @param hashedPassword  - User password hash.
+   * @param userEmail       - User email on whom we reset the password.
+   *
+   * @returns               - Successfull message indicating the password updated successfully.
+   */
   async resetUserPassword(hashedPassword: string, userEmail: string): Promise<any> {
     try {
 
