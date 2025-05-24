@@ -81,7 +81,7 @@ class Categories extends BaseController {
 
       return {
         id: insertResult[0].insertId,
-        message: `Category ${name} created successfully.`
+        message: `Category '${name}' created successfully.`
       }
 
     } catch (error:any) {
@@ -89,7 +89,7 @@ class Categories extends BaseController {
 
       if (error?.errno === 1062) {
         return {
-          message: `Category ${name} already exists.`
+          message: `Category '${name}' already exists.`
         }
       }
 
