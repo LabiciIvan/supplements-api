@@ -155,8 +155,6 @@ const resetUserPasswordHandler = async (req: Request, res: Response, next: NextF
  try {
     const resetPasswordToken = req.params.resetPasswordToken;
 
-    console.log('reset password token', resetPasswordToken);
-
     const newPassword = req.body.password;
 
     if (!newPassword) {
@@ -165,8 +163,6 @@ const resetUserPasswordHandler = async (req: Request, res: Response, next: NextF
     }
 
     const payload = await decodeJwtToken(resetPasswordToken);
-
-    console.log('token payload', payload);
 
     if (!payload || !payload.userEmail) {
       res.status(400).json({message: 'The password reset token is invalid or malformed.'});
@@ -180,10 +176,8 @@ const resetUserPasswordHandler = async (req: Request, res: Response, next: NextF
       return;
     }
 
-    console.log('isTokenValid', isTokenValid);
-
     const passwordUpdateResult = await authController.resetUserPassword(hashPassword(newPassword), payload.userEmail as string)
-    
+
     res.status(200).json(passwordUpdateResult);
 
  } catch (error: any) {
