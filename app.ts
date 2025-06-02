@@ -1,17 +1,31 @@
-var express         = require('express');
-var path            = require('path');
-var cookieParser    = require('cookie-parser');
-var logger          = require('morgan');
+import express        from 'express'
+import cookieParser   from 'cookie-parser';
+import router         from './core/router';
+import cors           from 'cors';
 
-var indexRouter = require('./routes/index');
+import { Request, Response, NextFunction } from 'express';
 
-var app = express();
+const app = express();
 
-app.use(logger('dev'));
 app.use(express.json());
+
 app.use(express.urlencoded({ extended: false }));
+
 app.use(cookieParser());
 
-app.use('/', indexRouter);
+// THE allowance CORS for the client side of this application.
+app.use(cors({
+  origin: 'http://localhost:5500',
+  credentials: true,
+}));
 
-module.exports = app;
+app.use('/api', router);
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.status(404).json({
+    message: 'Invalid application route.',
+  });
+  return;
+});
+
+export default app;
