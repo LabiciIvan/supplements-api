@@ -5,12 +5,9 @@ import {
   hasArrayData
 }                             from '../services/functions';
 import {
-  createdResource,
-  duplicateResource,
-  categoryResourceInterface,
-  resourceNotFound,
-  deletedResource,
-  categoryModelInterface
+  categoryModelInterface,
+  DataResponse,
+  BaseResponse
 }                             from '../types';
 import BaseController         from '../core/baseController';
 
@@ -22,7 +19,7 @@ class Categories extends BaseController {
   }
 
 
-  public async getCategoryById(categoryID: number): Promise<resourceNotFound | categoryResourceInterface> {
+  public async getCategoryById(categoryID: number): Promise<DataResponse<{id: number, category: string}> | BaseResponse> {
     try {
 
       const data: [any[], FieldPacket[]] = await this.db.query(
@@ -31,15 +28,20 @@ class Categories extends BaseController {
       );
 
       if (data[0].length === 0) {
-        return {message: 'Category not found.'};
+          return {
+          status: this.fail,
+          message: 'Category not found.',
+        };
       }
 
-      const category: categoryResourceInterface = {
-        id: data[0][0].id,
-        category: data[0][0].name
+      return  {
+        status: this.success,
+        message: 'Category fetched successfully.',
+        data: {
+          id: data[0][0].id,
+          category: data[0][0].name
+        }
       }
-
-      return category;
 
     } catch (error:any) {
       console.log('error in /controller/categories.tx/getCategoryById(): ', error);
@@ -48,7 +50,7 @@ class Categories extends BaseController {
   }
 
 
-  public async getAllCategories(): Promise<resourceNotFound | categoryResourceInterface[]> {
+  public async getAllCategories(): Promise<DataResponse<{id: number, category: string}[]> | BaseResponse> {
     try {
 
       const data: [any, FieldPacket[]] = await this.db.query(
@@ -57,13 +59,18 @@ class Categories extends BaseController {
 
       if (!hasArrayData(data)) {
         return {
+          status: this.fail,
           message: 'No categories found.'
         }
       }
 
-      const categories: categoryResourceInterface[] = data[0].map((cat: any) => ({id: cat.id, category: cat.name}));
+      const categories: {id: number, category: string}[] = data[0].map((cat: any) => ({id: cat.id, category: cat.name}));
 
-      return categories;
+      return {
+        status: this.success,
+        message: 'Categories fetched successfully.',
+        data: categories
+      }
 
     } catch (error:any) {
       console.log('error in /controller/categories.tx/getAllCategories(): ', error);
@@ -72,7 +79,7 @@ class Categories extends BaseController {
   }
 
 
-  public async createCategory(name: string): Promise<createdResource | duplicateResource> {
+  public async createCategory(name: string): Promise<DataResponse<{id: number}> | BaseResponse> {
     try {
       const insertResult: [any, FieldPacket[]] = await this.db.query(
         'INSERT INTO categories (name) VALUES (?)',
@@ -80,8 +87,9 @@ class Categories extends BaseController {
       );
 
       return {
-        id: insertResult[0].insertId,
-        message: `Category '${name}' created successfully.`
+        status: this.success,
+        message: `Category '${name}' created successfully.`,
+        data: { id: insertResult[0].insertId}
       }
 
     } catch (error:any) {
@@ -89,6 +97,7 @@ class Categories extends BaseController {
 
       if (error?.errno === 1062) {
         return {
+          status: this.fail,
           message: `Category '${name}' already exists.`
         }
       }
@@ -98,7 +107,7 @@ class Categories extends BaseController {
   }
 
 
-  public async deleteCategory(categoryID: number): Promise<resourceNotFound | deletedResource> {
+  public async deleteCategory(categoryID: number): Promise<BaseResponse> {
     try {
 
       const deleteResult: [any, FieldPacket[]] = await this.db.query(
@@ -107,6 +116,7 @@ class Categories extends BaseController {
       );
 
       return {
+        status: (deleteResult[0]?.affectedRows === 0 ? this.fail : this.success),
         message: (deleteResult[0]?.affectedRows === 0 ? `Category ${categoryID} doesn't exist.` : `Category ${categoryID} deleted.`)
       }
 
@@ -117,7 +127,7 @@ class Categories extends BaseController {
   }
 
 
-  public async patchCategory(category: categoryModelInterface): Promise<resourceNotFound |createdResource> {
+  public async patchCategory(category: categoryModelInterface): Promise<BaseResponse> {
     try {
 
       const patchResult: [any, FieldPacket[]] = await this.db.query(
@@ -127,12 +137,13 @@ class Categories extends BaseController {
 
       if (patchResult[0]?.affectedRows === 0) {
         return {
+          status: this.fail,
           message: `Category with ID ${category.id} not found.`
         };
       }
 
       return {
-        id: category.id,
+        status: this.success,
         message: `Category ${category.id} updated.`
       }
 
