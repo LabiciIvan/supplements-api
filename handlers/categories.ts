@@ -14,14 +14,23 @@ const categoriesController = new Categories();
 const getCategoriesHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
 
-    const fetchedResult = await categoriesController.getAllCategories();
+    const categories = await categoriesController.getAllCategories();
 
-    res.status(200).json(fetchedResult);
+    if ('status' in categories && categories.status === 'fail') {
+      res.status(404).json(categories);
+      return;
+    }
+
+    res.status(200).json(categories);
 
   } catch (error: any) {
+    console.log('Error in /handlers/categories/getCategoriesHandler(): ', error);
+
     res.status(500).json({
-      message: error?.message || 'Internal server error.'
-    })
+      status: 'error',
+      message: 'We\'re experiencing technical difficulties. Try again later or contact support for assistance.'
+    });
+    return;
   }
 }
 
@@ -31,21 +40,23 @@ const getCategoryHandler = async (req: Request, res: Response, next: NextFunctio
   try {
     const { categoryId } = req.params;
 
-    const fetchedResult = await categoriesController.getCategoryById(parseInt(categoryId));
+    const category = await categoriesController.getCategoryById(parseInt(categoryId));
 
-    if ('message' in fetchedResult) {
-      res.status(404).json(fetchedResult);
+    if ('status' in category && category.status === 'fail') {
+      res.status(404).json(category);
       return;
     }
 
-    res.status(200).json(fetchedResult);
+    res.status(200).json(category);
 
   } catch (error: any) {
     console.log('Error in /handlers/categories/getCategoryHandler(): ', error);
 
     res.status(500).json({
-      message: error.message || 'Internal server error.'
+      status: 'error',
+      message: 'We\'re experiencing technical difficulties. Try again later or contact support for assistance.'
     });
+    return;
   }
 }
 
@@ -55,15 +66,22 @@ const createCategoryHandler = async (req: Request, res: Response, next: NextFunc
   try {
     const {categoryName} = req.body;
 
-    const createdData = await categoriesController.createCategory(categoryName);
+    const createdCategory = await categoriesController.createCategory(categoryName);
 
-    res.status(200).json(createdData);
+    if ('status' in createdCategory && createdCategory.status === 'fail') {
+      res.status(404).json(createdCategory);
+      return;
+    }
+
+    res.status(200).json(createdCategory);
 
   } catch (error: any) {
     console.log('Error in /handlers/categories.tx/createCategoryHandler(): ', error);
     res.status(500).json({
-      message: error.message || 'Internal server error.'
-    })
+      status: 'error',
+      message: 'We\'re experiencing technical difficulties. Try again later or contact support for assistance.'
+    });
+    return;
   }
 }
 
@@ -73,16 +91,19 @@ const deleteCategoryHandler = async (req: Request, res: Response, next: NextFunc
   try {
     const { categoryId } = req.params;
 
-    const deletedData = await categoriesController.deleteCategory(parseInt(categoryId));
+    const deletedCategory = await categoriesController.deleteCategory(parseInt(categoryId));
 
-    res.status(200).json(deletedData);
+    const httpStatus = ('status' in deletedCategory && deletedCategory.status === 'fail' ? 404 : 200);
+
+    res.status(httpStatus).json(deletedCategory);
 
   } catch (error: any) {
     console.log('Error in /handlers/categories.tx/deleteCategoryHandler(): ', error);
-
     res.status(500).json({
-      message: error?.message || 'Internal sever error.'
-    })
+      status: 'error',
+      message: 'We\'re experiencing technical difficulties. Try again later or contact support for assistance.'
+    });
+    return;
   }
 }
 
@@ -99,16 +120,19 @@ const patchCategoryHandler = async (req: Request, res: Response, next: NextFunct
       name: categoryName
     }
 
-    const patchedData = await categoriesController.patchCategory(category);
+    const patchedCategory = await categoriesController.patchCategory(category);
 
-    res.status(200).json(patchedData);
+    const httpStatus = ('status' in patchedCategory && patchedCategory.status === 'fail' ? 404 : 200);
+
+    res.status(httpStatus).json(patchedCategory);
 
   } catch (error: any) {
     console.log('Error in /handlers/categories.tx/deleteCategoryHandler(): ', error);
-
     res.status(500).json({
-      message: error?.message || 'Internal sever error.'
-    })
+      status: 'error',
+      message: 'We\'re experiencing technical difficulties. Try again later or contact support for assistance.'
+    });
+    return;
   }
 }
 
