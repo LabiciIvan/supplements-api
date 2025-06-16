@@ -1,0 +1,10 @@
+CREATE TABLE login_attempts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NULL,
+  email VARCHAR(255) NOT NULL,
+  ip_address VARCHAR(45) NOT NULL,
+  user_agent TEXT,
+  success BOOLEAN NOT NULL,
+  attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);

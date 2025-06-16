@@ -1,0 +1,5 @@
+CREATE TABLE shipping_methods (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL UNIQUE,
+  price DECIMAL(10, 2) NOT NULL
+);
