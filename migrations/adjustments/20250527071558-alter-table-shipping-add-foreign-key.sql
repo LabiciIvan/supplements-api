@@ -1,0 +1,1 @@
+ALTER TABLE shipping ADD CONSTRAINT fk_shipping_method FOREIGN KEY (shipping_method) REFERENCES shipping_methods(name);

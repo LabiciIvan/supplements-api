@@ -1,0 +1,1 @@
+ALTER TABLE password_reset ADD COLUMN valid ENUM('Y', 'N') DEFAULT 'Y' AFTER reset;

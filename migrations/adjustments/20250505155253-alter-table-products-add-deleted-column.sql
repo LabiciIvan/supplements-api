@@ -1,0 +1,1 @@
+ALTER TABLE products ADD COLUMN deleted BOOLEAN DEFAULT 0 AFTER created_at;
