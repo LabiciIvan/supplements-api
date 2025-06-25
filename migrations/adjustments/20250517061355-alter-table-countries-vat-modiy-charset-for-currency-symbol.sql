@@ -1,0 +1,1 @@
+ALTER TABLE countries_vat MODIFY COLUMN currency_symbol VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

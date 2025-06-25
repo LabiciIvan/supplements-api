@@ -1,0 +1,1 @@
+ALTER TABLE orders ADD COLUMN previous_status ENUM('pending', 'confirmed', 'shipped', 'delivered', 'cancelled') NULL DEFAULT NULL AFTER updated_at;
