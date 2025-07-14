@@ -98,10 +98,17 @@ class Auth extends BaseController {
    * @returns  - A promise that resolves to an array containing the user's ID, email, and password
    *             hash if the user exists, or an empty array if the user does not exist.
    */
-  public async checkUserExists(email: string): Promise<[{id: number; email: string; password_hash: string}]> {
+  public async checkUserExists(email: string): Promise<[{id: number; name: string, email: string; password_hash: string, role: string}]> {
     try {
       const [user]: [any, FieldPacket[]] = await this.db.query(
-        'SELECT id, email, password_hash FROM users WHERE email = ? AND deleted = 0',
+        `SELECT
+          u.id AS id,
+          u.username AS name,
+          u.email AS email,
+          u.password_hash AS password_hash,
+          r.role AS role
+          FROM users AS u INNER JOIN roles AS r ON u.id = r.user_id
+          WHERE u.email = ? AND u.deleted = 0`,
         [email]
       );
 
@@ -128,7 +135,7 @@ class Auth extends BaseController {
    * @returns - A promise that resolves to an object containing a token if the login is successful,
    *            or an error message if the login fails or the user has exceeded the allowed attempts.
    */
-  async login(email: string, password: string, ipAddress: string, userAgent: string): Promise<{token?: string} | {message: string}> {
+  async login(email: string, password: string, ipAddress: string, userAgent: string): Promise<{token?: string, user: {id: number, name: string, email: string, role: string}} | {message: string}> {
     try {
       const user = await this.checkUserExists(email);
 
@@ -178,7 +185,15 @@ class Auth extends BaseController {
         [user[0].id, token, ipAddress, userAgent]
       );
 
-      return {token: token};
+      return {
+        token: token,
+        user: {
+          id: user[0].id,
+          name: user[0].name,
+          email: user[0].email,
+          role: user[0].role,
+        }
+      };
 
     } catch (error: any) {
       console.log('Error in /controllers/authentication.ts/login: ', error);
@@ -223,7 +238,7 @@ class Auth extends BaseController {
    * @returns  - A promise that resolves to an object containing a message and the user ID if the 
    *             registration is successful, or an error message if the registration fails.
    */
-  async register(username: string, email: string, password: string): Promise<{ message: string; userId?: number }> {
+  async register(username: string, email: string, password: string): Promise<{ status: string, message: string; userId?: number }> {
     try {
 
       const [result]: [any, FieldPacket[]] = await this.db.query(
@@ -238,6 +253,7 @@ class Auth extends BaseController {
       )
 
       return {
+        status: this.success,
         message: 'User registered successfully.',
         userId: result.insertId,
       };
@@ -416,6 +432,7 @@ class Auth extends BaseController {
 
       if (userPasswords[0].pwd1 === hashedPassword || userPasswords[0].pwd2 === hashedPassword || userPasswords[0].pwd3 === hashedPassword || userPasswords[0].pwd4 === hashedPassword || userPasswords[0].currentPassword === hashedPassword) {
         return {
+          status: this.fail,
           message: 'Please choose a password that is different from your previous passwords.'
         }
       }
@@ -440,6 +457,7 @@ class Auth extends BaseController {
       );
 
       return {
+        status: this.success,
         message: 'Your password has been updated successfully.'
       }
 
