@@ -148,6 +148,32 @@ class Orders extends BaseController {
     }
   }
 
+  public async getOrderStatuses(): Promise<orderStatusInterface | BaseResponse> {
+    try {
+
+      const fetchedData: [any, FieldPacket[]] = await this.db.query(
+        'SELECT id, status FROM order_status WHERE status = ?',
+        [status]
+      );
+
+      if (!hasArrayData(fetchedData)) {
+        return {
+          status: this.fail,
+          message: `Status ${status} not found.`
+        }
+      }
+
+      return {
+        id: fetchedData[0][0].id,
+        status: fetchedData[0][0].status,
+      }
+
+    } catch (error: any) {
+      console.log('Error in /controllers/orders.ts/getStatusId(): ', error);
+      throw new Error(error.message);
+    }
+  }
+
 
   private async getStatusId(status: orderStatusType): Promise<orderStatusInterface | BaseResponse> {
     try {
@@ -337,6 +363,7 @@ class Orders extends BaseController {
       }
 
       return {
+        status: this.success,
         details: orderDetails,
         products: productsOrderDetails,
       }
@@ -393,14 +420,15 @@ class Orders extends BaseController {
 
   public async getOrderByFilters(
     orderId?: string,
-    status?: string, 
-    year?: string, 
-    month?: string, 
-    day?: string, 
+    status?: string,
+    date?: string,
+    year?: string,
+    month?: string,
+    day?: string,
     shipping?: string,
     city?: string,
     country?: string
-  ): Promise<BaseResponse | orderDataFiltered[]> {
+  ): Promise< BaseResponse | DataResponse<{details: any[], products: any[]}[]> > {
     try {
       // Build dynamic SQL where clauses or filter logic
       const filters: string[] = [];
@@ -414,6 +442,20 @@ class Orders extends BaseController {
       if (status) {
         filters.push(`os.status = ?`);
         values.push(status);
+      }
+
+      if (date) {
+        filters.push(`o.created_at >= ? AND o.created_at < ?`);
+
+        const startDate = `${date} 00:00:00`;
+
+        const nextDate = new Date(date);
+
+        nextDate.setDate(nextDate.getDate() + 1);
+
+        const endDate = `${nextDate.toISOString().split('T')[0]} 00:00:00`;
+
+        values.push(startDate, endDate);
       }
 
       if (year) {
@@ -450,20 +492,26 @@ class Orders extends BaseController {
 
       const ordersFetched: [any, FieldPacket[]] = await this.db.query(
         `SELECT
-          o.id AS order_id,
-          o.created_at,
           p.id AS product_id,
           p.name,
           op.quantity,
           op.base_price,
-          (op.quantity * op.base_price) AS product_total,
+          op.vat_applied,
+          op.vat_value,
+          op.total_price,
           o.total AS order_total,
+          o.id AS order_id,
+          o.created_at AS order_date,
           sp.address,
           sp.city,
           sp.country,
           sp.postal_code,
           sp.shipping_method,
           sp.shipping_cost,
+          cv.vat,
+          cv.year AS vat_year_applied,
+          cv.currency AS currency,
+          cv.currency_symbol AS currencySymbol,
           (o.total + sp.shipping_cost) AS total_with_shipping,
           os.status AS order_status,
           COALESCE(u.username, 'Guest') AS customer_name,
@@ -473,6 +521,7 @@ class Orders extends BaseController {
         INNER JOIN orders AS o ON op.order_id = o.id
         INNER JOIN shipping AS sp ON o.shipping_id = sp.id
         INNER JOIN order_status AS os ON o.status_id = os.id
+        INNER JOIN countries_vat AS cv ON o.country_vat_id = cv.id
         LEFT JOIN users AS u ON u.id = o.user_id
         ${whereClause}`,
         values
@@ -485,94 +534,76 @@ class Orders extends BaseController {
         }
       }
 
-      const orderDataFiltered: orderDataFiltered[] = [];
+      const fetchedOrders: any[] = ordersFetched[0];
 
-      let tempOrder: detailsFiltered = {
-        order_id: 0,
-        address: '',
-        city: '',
-        country: '',
-        postal_code: '',
-        shipping_method: '',
-        shipping_cost: 0,
-        order_total: 0,
-        total_with_shipping: 0,
-        order_status: 'cancelled',
-        customer_name: '',
-        customer_email: '',
-      };
-
-      let tempProducts: any[] = [];
-
-      let tempOrderId: number = 0;
-
-      ordersFetched[0].forEach((order: any, index: number) => {
-
-        // In case there's only one order_id fetched and there is not other orders we need to add
-        // the data manually outside the forEach.
-        if (order.order_id !== tempOrderId) {
-          // Already iterated one order and moved to another order if order ids don't match.
-          if (tempOrderId !== 0) {
-            orderDataFiltered.push({
-              order: {
-                details: tempOrder,
-                products: tempProducts
-              }
-            });
-
-            tempProducts = [];
-          }
-
-          tempOrderId = order.order_id;
-
-          tempOrder = {
-            order_id:             parseInt(order.order_id),
-            address:              order.address,
-            city:                 order.city,
-            country:              order.country,
-            postal_code:          order.postal_code,
-            shipping_method:      order.shipping_method,
-            shipping_cost:        parseFloat(order.shipping_cost),
-            order_total:          parseFloat(order.order_total),
-            total_with_shipping:  parseFloat(order.total_with_shipping),
-            order_status:         order.order_status,
-            customer_name:        order.customer_name,
-            customer_email:       order.customer_email
-          }
-        }
-
-        if (order.order_id === tempOrderId) {
-          tempProducts.push({
-            product_id:     order.product_id,
-            name:           order.name,
-            quantity:       parseInt(order.quantity),
-            base_price:     parseFloat(order.base_price),
-            product_total:  parseFloat(order.product_total)
-          });
-        }
-      });
-
-
-      // If in the forEach the order id didn't changed from various reasons, it means we only have
-      // one category and manually need to push the data into the orderDataFiltered[] array.
-      if (orderDataFiltered.length === 0) {
-          orderDataFiltered.push({
-            order: {
-              details: tempOrder,
-              products: tempProducts
-            }
-          });
+      if (!fetchedOrders.length) {
+        return {
+          status: this.fail,
+          message: `Filtered order not found.`
+        };
       }
 
-      return orderDataFiltered;
+      // A map to group products by order_id
+      const ordersMap = new Map<number, { details: any, products: any[] }>();
+
+      for (const row of fetchedOrders) {
+        const orderId = parseInt(row.order_id);
+
+        // If this order hasn't been added to the map yet
+        if (!ordersMap.has(orderId)) {
+          ordersMap.set(orderId, {
+            details: {
+              order_id:             row.order_id,
+              order_date:           row.order_date,
+              address:              row.address,
+              city:                 row.city,
+              country:              row.country,
+              postal_code:          row.postal_code,
+              shipping_method:      row.shipping_method,
+              shipping_cost:        parseFloat(row.shipping_cost),
+              order_total:          parseFloat(row.order_total),
+              total_with_shipping:  parseFloat(row.total_with_shipping),
+              order_status:         row.order_status,
+              customer_name:        row.customer_name,
+              customer_email:       row.customer_email,
+              vat:                  row.vat,
+              vatYearApplied:       row.vat_year_applied,
+              currency:             row.currency,
+              currencySymbol:       row.currencySymbol,
+            },
+            products: []
+          });
+        }
+
+        // Push the product for the order
+        ordersMap.get(orderId)!.products.push({
+          product_id:   row.product_id,
+          name:         row.name,
+          quantity:     parseInt(row.quantity),
+          base_price:   parseFloat(row.base_price),
+          vat_applied:  parseFloat(row.vat_applied),
+          vat_value:    parseFloat(row.vat_value),
+          total_price:  parseFloat(row.total_price)
+        });
+      }
+
+      // Convert Map values to array
+      const finalFilteredOrders = Array.from(ordersMap.values());
+
+      return {
+        message: 'Order fetched successfully',
+        status: this.success,
+        data: finalFilteredOrders
+      };
 
     } catch (error: any) {
       console.log('Error in /controllers/orders.ts/getOrderByFilters(): ', error);
       throw new Error(error.message);
     }
   }
-  
+
 }
+
 
 export default Orders;
 
