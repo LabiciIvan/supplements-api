@@ -7,23 +7,30 @@ import {
 }                           from '../types';
 
 
-class shippingMethod extends BaseController {
+class ShippingMethod extends BaseController {
 
   constructor() {
     super();
   }
 
 
-  public async createNewShipping(name: string, price: string): Promise<void> {
+  public async createNewShipping(name: string, price: string): Promise<BaseResponse> {
     try {
       await this.db.query(
         'INSERT INTO shipping_methods (name, price) VALUES (?, ?)',
         [name, price]
       );
 
+      return {
+        status: this.success,
+        message: 'Shipping method created',
+      }
+
     } catch (error: any) {
       console.log('Error in controllers/shippingMethod/createNewShipping(): ', error);
-      return (error?.message || 'Internal server error');
+
+      // throw error further to handel it inside the handler.
+      throw error;
     }
   }
 
@@ -44,7 +51,7 @@ class shippingMethod extends BaseController {
       return {
         status: this.success,
         message: 'Shipping methods fetched successfully.',
-        data: shipping, 
+        data: shipping,
       };
 
     } catch (error: any) {
@@ -54,10 +61,10 @@ class shippingMethod extends BaseController {
   }
 
 
-  public async getShippingDetails(name: string): Promise<DataResponse<{name: string, price: number}> | BaseResponse> {
+  public async getShippingDetails(name: string): Promise<DataResponse<{id: number, name: string, price: number}> | BaseResponse> {
     try {
       const [shipping]: [any, FieldPacket[]] = await this.db.query(
-        "SELECT name, price FROM shipping_methods WHERE name = ?",
+        "SELECT id, name, price FROM shipping_methods WHERE name = ?",
         [name]
       );
 
@@ -72,6 +79,7 @@ class shippingMethod extends BaseController {
         status: this.success,
         message: 'Shipping method fetched successfully',
         data: {
+          id: shipping[0].id,
           name: shipping[0].name,
           price: shipping[0].price
         }
@@ -79,11 +87,58 @@ class shippingMethod extends BaseController {
 
     } catch (error: any) {
       console.log('Error in controllers/shippingMethod/getShippingDetails(): ', error);
-      return (error?.message || 'Internal server error');
+      return {
+        status: this.fail,
+        message: error?.message || 'Internal server error',
+      };
+    }
+  }
+
+
+
+  public async updateShipping(id:number, name: string, price: string): Promise<BaseResponse> {
+    try {
+      await this.db.query(
+        'UPDATE shipping_methods SET name = ?, price = ? WHERE id = ?',
+        [name, price, id]
+      );
+
+      return {
+        status: this.success,
+        message: 'Shipping method updated.',
+      }
+
+    } catch (error: any) {
+      console.log('Error in controllers/shippingMethod/updateShipping(): ', error);
+
+      // throw error further to handel it inside the handler.
+      throw error;
+    }
+  }
+
+
+  
+  public async deleteShipping(id:number): Promise<BaseResponse> {
+    try {
+      await this.db.query(
+        'DELETE FROM shipping_methods WHERE id = ?',
+        [id]
+      );
+
+      return {
+        status: this.success,
+        message: 'Shipping method deleted.',
+      }
+
+    } catch (error: any) {
+      console.log('Error in controllers/shippingMethod/updateShipping(): ', error);
+
+      // throw error further to handel it inside the handler.
+      throw error;
     }
   }
 
 
 }
 
-export default shippingMethod;
+export default ShippingMethod;
