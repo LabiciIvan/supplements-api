@@ -20,7 +20,13 @@ const loginHandler = async (req: Request, res: Response, next: NextFunction): Pr
     const login     = await authController.login(req.body.email, req.body.password, IP, userAgent);
 
     if ('message' in login) {
-      res.status(400).send(login);
+      res.status(400).json({
+        status: 'fail',
+        errors: [{
+          path: 'email',
+          msg: login.message
+        }]
+      })
       return;
     }
 
@@ -58,6 +64,16 @@ const registerHandler = async (req: Request, res: Response, next: NextFunction):
   } catch (error: any) {
     console.log('Error in /handlers/auth.ts/registerHandler: ', error)
     // MySQL or Server error
+    if (error.message === 'Username or email already exists') {
+      res.status(400).json({
+        status: 'fail',
+        errors: [{
+          path: 'email',
+          msg: error.message
+        }]
+      })
+      return;
+    }
     res.status(500).json({
       message: error?.message || 'Internal server error.',
     });
@@ -165,14 +181,14 @@ const resetUserPasswordHandler = async (req: Request, res: Response, next: NextF
     const payload = await decodeJwtToken(resetPasswordToken);
 
     if (!payload || !payload.userEmail) {
-      res.status(400).json({message: 'The password reset token is invalid or malformed.'});
+      res.status(400).json({status: 'fail', message: 'The password reset token is invalid or malformed.'});
       return;
     }
 
     const isTokenValid = await authController.isResetTokenValid(resetPasswordToken);
 
     if (!isTokenValid) {
-      res.status(400).json({message: 'The password reset token has been used.'});
+      res.status(400).json({status: 'fail', message: 'The password reset token has been used.'});
       return;
     }
 
