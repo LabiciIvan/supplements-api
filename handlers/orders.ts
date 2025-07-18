@@ -132,6 +132,25 @@ const placeOrderHandler = async (req: Request, res: Response, next: NextFunction
 }
 
 
+const getAvailableOrderStatuses = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+
+    const order = await ordersController.getOrderStatuses();
+
+    res.status(200).json(order);
+  } catch (error: any) {
+    console.log('Error in /handlers/orders.tx/getOrderHandler(): ', error);
+
+    res.status(500).json({
+      status: 'error',
+      message: 'We\'re experiencing technical difficulties. Try again later or contact support for assistance.'
+    });
+
+    return;
+  }
+}
+
+
 const getOrderHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const {orderId} = req.params;
@@ -177,6 +196,7 @@ const updateOrderHandler = async (req: Request, res: Response, next: NextFunctio
 
     if (!nextAllowedStatus.includes(status)) {
       res.status(401).json({
+        status: 'fail',
         message: `Order status phase is not correct, allowed only: ${nextAllowedStatus}.`
       });
       return;
@@ -224,8 +244,9 @@ const filterOrdersHandler = async (req: Request, res: Response, next: NextFuncti
     const shipping  = req.query.shipping?.toString();
     const city      = req.query.city?.toString();
     const country   = req.query.country?.toString();
+    const date      = req.query.date?.toString();
 
-    const filteredOrders = await ordersController.getOrderByFilters(orderId, status, year, month, day, shipping, city, country);
+    const filteredOrders = await ordersController.getOrderByFilters(orderId, status, date, year, month, day, shipping, city, country);
 
     res.status(200).json(filteredOrders);
 
@@ -246,5 +267,6 @@ export {
   placeOrderHandler,
   updateOrderHandler,
   getOrderHandler,
-  filterOrdersHandler
+  filterOrdersHandler,
+  getAvailableOrderStatuses
 }
