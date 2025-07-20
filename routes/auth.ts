@@ -1,6 +1,5 @@
 import { RequestHandler }   from 'express';
 import express              from 'express';
-import validateRegisterData from '../middlewares/validateRegisterData';
 import requireToken         from '../middlewares/requireToken';
 import isTokenValid         from '../middlewares/isTokenValid';
 import attachToken          from '../middlewares/attachToken';
@@ -15,15 +14,21 @@ import {
 }                           from '../handlers/auth';
 
 
+import {
+  validateLoginUser,
+  validateRegisterUser
+}                           from '../validations/auth';
+
+
 const auth = express.Router();
 
 
 // Log in to the application.
-auth.post('/login', loginHandler);
+auth.post('/login', validateLoginUser as RequestHandler, loginHandler);
 
 
 // Register a new user.
-auth.post('/register', validateRegisterData as RequestHandler, registerHandler);
+auth.post('/register', validateRegisterUser as RequestHandler, registerHandler);
 
 
 // Log out from the application.
