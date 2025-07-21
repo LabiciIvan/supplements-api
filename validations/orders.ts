@@ -96,6 +96,11 @@ const validateFilterOrdersHandler = async (req: Request, res: Response, next: Ne
       .matches(/^(pending|confirmed|shipped|delivered|cancelled)$/)
       .withMessage("The 'status' parameter can be one of the following: pending|confirmed|shipped|delivered|cancelled.")
       .run(req),
+    query('date')
+      .optional()
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage("The 'date' parameter must be in the format YYYY-MM-DD.")
+      .run(req),
     query('year')
       .optional()
       .isNumeric()
