@@ -48,8 +48,8 @@ const restricViewOrder = async (req: Request, res: Response, next: NextFunction)
       [orderId, token]
     );
 
-
-    if (!hasArrayData(userFetched[0]) || userFetched[0][0].order_id == null) {
+    console.log('restirct order', userFetched);
+    if (!hasArrayData(userFetched[0]) || (userFetched[0][0].order_id == null && userFetched[0][0].role !== 'admin')) {
       return res.status(404).json({
         message: 'Order could not be found.'
       });
