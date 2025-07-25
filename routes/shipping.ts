@@ -27,31 +27,31 @@ shipping.get('/get',
 
 
 shipping.post('/create',
-  requireToken                  as RequestHandler,
   attachToken                   as RequestHandler,
+  requireToken                  as RequestHandler,
   isTokenValid                  as RequestHandler,
   isAdmin                       as RequestHandler,
-  validateDeleteShipping        as RequestHandler,
+  validateCreateShipping        as RequestHandler,
   createShippingHandler
 );
 
 
-shipping.put('/update',
-  requireToken                  as RequestHandler,
+shipping.put('/update/:shippingName',
   attachToken                   as RequestHandler,
+  requireToken                  as RequestHandler,
   isTokenValid                  as RequestHandler,
   isAdmin                       as RequestHandler,
-  validateCreateShipping        as RequestHandler,
+  validateUpdateShipping        as RequestHandler,
   updateShippingHandler
 );
 
 
-shipping.delete('/delete',
-  requireToken                  as RequestHandler,
+shipping.delete('/delete/:shippingName',
   attachToken                   as RequestHandler,
+  requireToken                  as RequestHandler,
   isTokenValid                  as RequestHandler,
   isAdmin                       as RequestHandler,
-  validateUpdateShipping        as RequestHandler,
+  validateDeleteShipping        as RequestHandler,
   deleteShippingHandler
 );
 
